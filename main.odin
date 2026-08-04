@@ -17,6 +17,8 @@ Grid :: [ROWS * COLS]Cell
 MINE_COUNT :: COLS * ROWS / 5
 MINE_VALUE :: 9
 
+Textures :: map[string]rl.Texture2D
+
 Coord :: struct {
 	col: int,
 	row: int,
@@ -42,12 +44,15 @@ Game_State :: enum {
 }
 
 Game :: struct {
-	state: Game_State,
-	cells: Grid,
-	quit:  bool,
+	state:    Game_State,
+	cells:    Grid,
+	textures: Textures,
+	quit:     bool,
 }
 
 game_init :: proc(game: ^Game) {
+	load_textures(game)
+
 	game.state = Game_State.INIT
 	game.cells = Grid{}
 
@@ -87,6 +92,57 @@ init_values :: proc(cells: ^Grid) {
 
 		c.value = v
 	}
+}
+
+load_textures :: proc(game: ^Game) {
+	game.textures = map[string]rl.Texture2D{}
+
+	game.textures["base_closed"] = rl.LoadTexture("assets/base_closed.png")
+	game.textures["base_open"] = rl.LoadTexture("assets/base_open.png")
+	game.textures["flag"] = rl.LoadTexture("assets/flag.png")
+
+	game.textures["mine"] = rl.LoadTexture("assets/mine.png")
+	game.textures["mine_explode"] = rl.LoadTexture("assets/mine_explode.png")
+	game.textures["mine_wrong"] = rl.LoadTexture("assets/mine_wrong.png")
+
+	game.textures["one"] = rl.LoadTexture("assets/one.png")
+	game.textures["two"] = rl.LoadTexture("assets/two.png")
+	game.textures["three"] = rl.LoadTexture("assets/three.png")
+	game.textures["four"] = rl.LoadTexture("assets/four.png")
+	game.textures["five"] = rl.LoadTexture("assets/five.png")
+	game.textures["six"] = rl.LoadTexture("assets/six.png")
+	game.textures["seven"] = rl.LoadTexture("assets/seven.png")
+	game.textures["eight"] = rl.LoadTexture("assets/eight.png")
+}
+
+get_cell_texture :: proc(game: ^Game, c: Cell) -> ^rl.Texture2D {
+	if c.state == Cell_State.CLOSED do return &game.textures["base_closed"]
+	if c.state == Cell_State.FLAGGED do return &game.textures["flag"]
+
+	switch c.value {
+	case 0:
+		return &game.textures["base_open"]
+	case 1:
+		return &game.textures["one"]
+	case 2:
+		return &game.textures["two"]
+	case 3:
+		return &game.textures["three"]
+	case 4:
+		return &game.textures["four"]
+	case 5:
+		return &game.textures["five"]
+	case 6:
+		return &game.textures["six"]
+	case 7:
+		return &game.textures["seven"]
+	case 8:
+		return &game.textures["eight"]
+	case 9:
+		return &game.textures["mine"]
+	}
+
+	return &game.textures["base_open"]
 }
 
 update :: proc(game: ^Game) {
@@ -211,10 +267,10 @@ set_game_over :: proc(game: ^Game) {
 	game.state = Game_State.GAME_OVER
 }
 
-draw :: proc(game: Game) {
+draw :: proc(game: ^Game) {
 	rl.ClearBackground(rl.RAYWHITE)
 
-	draw_cells(game.cells)
+	draw_cells(game)
 
 	if game.state == Game_State.GAME_OVER {
 		draw_game_over()
@@ -233,50 +289,15 @@ draw_game_over :: proc() {
 	)
 }
 
-draw_cells :: proc(cells: Grid) {
-	for c in cells {
+draw_cells :: proc(game: ^Game) {
+	for c in game.cells {
 		x := c.col * CELL_SIZE
 		y := c.row * CELL_SIZE
 
-		switch c.state {
-		case Cell_State.CLOSED:
-			rl.DrawRectangle(i32(x), i32(y), CELL_SIZE, CELL_SIZE, rl.DARKGREEN)
-
-		case Cell_State.FLAGGED:
-			rl.DrawRectangle(i32(x), i32(y), CELL_SIZE, CELL_SIZE, rl.DARKGREEN)
-			cx := x + CELL_SIZE / 2
-			cy := y + CELL_SIZE / 2
-			rl.DrawCircle(i32(cx), i32(cy), CELL_SIZE / 4, rl.RED)
-
-		case Cell_State.OPEN:
-			rl.DrawRectangle(
-				i32(x),
-				i32(y),
-				CELL_SIZE,
-				CELL_SIZE,
-				c.value == 9 ? rl.RED : rl.WHITE,
-			)
-
-			font_size := CELL_SIZE / 2
-			text: string
-			if c.value == 9 {
-				rl.DrawText(
-					"*",
-					i32(x + CELL_SIZE / 2 - font_size / 2),
-					i32(y + CELL_SIZE / 2 - font_size / 2),
-					i32(font_size),
-					rl.BLACK,
-				)
-			} else {
-				rl.DrawText(
-					fmt.ctprintf("%d", c.value),
-					i32(x + CELL_SIZE / 2 - font_size / 2),
-					i32(y + CELL_SIZE / 2 - font_size / 2),
-					i32(font_size),
-					rl.BLACK,
-				)
-			}
-		}
+		texture := get_cell_texture(game, c)
+		pos := rl.Vector2{f32(x), f32(y)}
+		scale := f32(CELL_SIZE) / f32(texture.width)
+		rl.DrawTextureEx(texture^, pos, 0, scale, rl.WHITE)
 	}
 }
 
@@ -295,17 +316,18 @@ quit :: proc() {
 }
 
 main :: proc() {
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Minesweeper")
+
 	game := Game{}
 	game_init(&game)
 
-	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Minesweeper")
 	defer rl.CloseWindow()
 
 	for !rl.WindowShouldClose() && !game.quit {
 		update(&game)
 
 		rl.BeginDrawing()
-		draw(game)
+		draw(&game)
 		rl.EndDrawing()
 	}
 
