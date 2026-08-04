@@ -12,6 +12,7 @@ COLS :: WINDOW_WIDTH / 40
 ROWS :: COLS
 
 CELL_SIZE :: WINDOW_WIDTH / COLS
+Grid :: [ROWS * COLS]Cell
 
 MINE_COUNT :: COLS * ROWS / 5
 MINE_VALUE :: 9
@@ -42,12 +43,13 @@ Game_State :: enum {
 
 Game :: struct {
 	state: Game_State,
-	cells: [ROWS * COLS]Cell,
+	cells: Grid,
+	quit:  bool,
 }
 
 game_init :: proc(game: ^Game) {
 	game.state = Game_State.INIT
-	game.cells = [ROWS * COLS]Cell{}
+	game.cells = Grid{}
 
 	for i in 0 ..< ROWS * COLS {
 		game.cells[i].row = i / COLS
@@ -59,7 +61,7 @@ game_init :: proc(game: ^Game) {
 }
 
 
-place_mines :: proc(cells: ^[ROWS * COLS]Cell) {
+place_mines :: proc(cells: ^Grid) {
 	placed := 0
 	for placed < MINE_COUNT {
 		i := rand.int32_range(0, ROWS * COLS)
@@ -72,7 +74,7 @@ place_mines :: proc(cells: ^[ROWS * COLS]Cell) {
 	}
 }
 
-init_values :: proc(cells: ^[ROWS * COLS]Cell) {
+init_values :: proc(cells: ^Grid) {
 	for &c, i in cells {
 		if c.value == MINE_VALUE do continue
 		v := 0
@@ -88,6 +90,10 @@ init_values :: proc(cells: ^[ROWS * COLS]Cell) {
 }
 
 update :: proc(game: ^Game) {
+	if rl.IsKeyPressed(.Q) {
+		game.quit = true
+		return
+	}
 
 	if rl.IsKeyPressed(.R) do game_init(game)
 
@@ -227,7 +233,7 @@ draw_game_over :: proc() {
 	)
 }
 
-draw_cells :: proc(cells: [ROWS * COLS]Cell) {
+draw_cells :: proc(cells: Grid) {
 	for c in cells {
 		x := c.col * CELL_SIZE
 		y := c.row * CELL_SIZE
@@ -272,10 +278,9 @@ draw_cells :: proc(cells: [ROWS * COLS]Cell) {
 			}
 		}
 	}
-
 }
 
-print_grid :: proc(cells: [ROWS * COLS]Cell) {
+print_grid :: proc(cells: Grid) {
 	for c, i in cells {
 		fmt.print(fmt.ctprintf("%d ", c.value))
 		if i % COLS == COLS - 1 {
@@ -285,6 +290,10 @@ print_grid :: proc(cells: [ROWS * COLS]Cell) {
 	fmt.println()
 }
 
+quit :: proc() {
+
+}
+
 main :: proc() {
 	game := Game{}
 	game_init(&game)
@@ -292,11 +301,13 @@ main :: proc() {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Minesweeper")
 	defer rl.CloseWindow()
 
-	for !rl.WindowShouldClose() {
+	for !rl.WindowShouldClose() && !game.quit {
 		update(&game)
 
 		rl.BeginDrawing()
 		draw(game)
 		rl.EndDrawing()
 	}
+
+	quit()
 }
