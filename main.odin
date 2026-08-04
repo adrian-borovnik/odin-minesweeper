@@ -53,7 +53,7 @@ Game :: struct {
 game_init :: proc(game: ^Game) {
 	load_textures(game)
 
-	game.state = Game_State.INIT
+	game.state = .INIT
 	game.cells = Grid{}
 
 	for i in 0 ..< ROWS * COLS {
@@ -74,7 +74,7 @@ place_mines :: proc(cells: ^Grid) {
 
 		if cell.value == MINE_VALUE do continue
 
-		cell.value = 9
+		cell.value = MINE_VALUE
 		placed += 1
 	}
 }
@@ -87,7 +87,7 @@ init_values :: proc(cells: ^Grid) {
 		neighbours := get_neighbour_indices(i)
 		for n in neighbours {
 			other_cell := cells[n]
-			if other_cell.value == 9 do v += 1
+			if other_cell.value == MINE_VALUE do v += 1
 		}
 
 		c.value = v
@@ -116,8 +116,14 @@ load_textures :: proc(game: ^Game) {
 }
 
 get_cell_texture :: proc(game: ^Game, c: Cell) -> ^rl.Texture2D {
-	if c.state == Cell_State.CLOSED do return &game.textures["base_closed"]
-	if c.state == Cell_State.FLAGGED do return &game.textures["flag"]
+	if game.state == .GAME_OVER {
+		if c.value == MINE_VALUE && c.state == .OPEN do return &game.textures["mine_explode"]
+		if c.value == MINE_VALUE && c.state == .CLOSED do return &game.textures["mine"]
+		if c.value != MINE_VALUE && c.state == .FLAGGED do return &game.textures["mine_wrong"]
+	}
+
+	if c.state == .CLOSED do return &game.textures["base_closed"]
+	if c.state == .FLAGGED do return &game.textures["flag"]
 
 	switch c.value {
 	case 0:
@@ -138,7 +144,7 @@ get_cell_texture :: proc(game: ^Game, c: Cell) -> ^rl.Texture2D {
 		return &game.textures["seven"]
 	case 8:
 		return &game.textures["eight"]
-	case 9:
+	case MINE_VALUE:
 		return &game.textures["mine"]
 	}
 
@@ -153,7 +159,7 @@ update :: proc(game: ^Game) {
 
 	if rl.IsKeyPressed(.R) do game_init(game)
 
-	if game.state == Game_State.GAME_OVER do return
+	if game.state == .GAME_OVER do return
 
 	if rl.IsMouseButtonPressed(.LEFT) {
 		coords := get_mouse_coords()
@@ -176,11 +182,11 @@ open_cell :: proc(game: ^Game, idx: int) {
 		i := queue.pop_front(&q)
 		c := &game.cells[i]
 
-		if c.state == Cell_State.FLAGGED do continue
+		if c.state == .FLAGGED do continue
 
 		#partial switch c.state {
-		case Cell_State.CLOSED:
-			c.state = Cell_State.OPEN
+		case .CLOSED:
+			c.state = .OPEN
 
 			if c.value == MINE_VALUE {
 				set_game_over(game)
@@ -192,20 +198,20 @@ open_cell :: proc(game: ^Game, idx: int) {
 			neighbours := get_neighbour_indices(i)
 			for n in neighbours {
 				neighbour := &game.cells[n]
-				if neighbour.state == Cell_State.OPEN do continue
+				if neighbour.state == .OPEN do continue
 
 				queue.push_back(&q, n)
 			}
 
-		case Cell_State.OPEN:
+		case .OPEN:
 			neighbours := get_neighbour_indices(i)
 			flag_count := 0
 			closed_neighbours: [dynamic]int
 
 			for n in neighbours {
 				neighbour := &game.cells[n]
-				if neighbour.state == Cell_State.FLAGGED do flag_count += 1
-				else if neighbour.state == Cell_State.CLOSED do append(&closed_neighbours, n)
+				if neighbour.state == .FLAGGED do flag_count += 1
+				else if neighbour.state == .CLOSED do append(&closed_neighbours, n)
 			}
 
 			if flag_count != c.value do continue
@@ -218,10 +224,10 @@ open_cell :: proc(game: ^Game, idx: int) {
 flag_cell :: proc(game: ^Game, idx: int) {
 	c := &game.cells[idx]
 	#partial switch c.state {
-	case Cell_State.CLOSED:
-		c.state = Cell_State.FLAGGED
-	case Cell_State.FLAGGED:
-		c.state = Cell_State.CLOSED
+	case .CLOSED:
+		c.state = .FLAGGED
+	case .FLAGGED:
+		c.state = .CLOSED
 	}
 }
 
@@ -264,7 +270,7 @@ get_coord_index :: proc(coords: Coord) -> int {
 }
 
 set_game_over :: proc(game: ^Game) {
-	game.state = Game_State.GAME_OVER
+	game.state = .GAME_OVER
 }
 
 draw :: proc(game: ^Game) {
@@ -272,13 +278,13 @@ draw :: proc(game: ^Game) {
 
 	draw_cells(game)
 
-	if game.state == Game_State.GAME_OVER {
+	if game.state == .GAME_OVER {
 		draw_game_over()
 	}
 }
 
 draw_game_over :: proc() {
-	rl.DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, rl.ColorAlpha(rl.BLACK, 0.7))
+	rl.DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, rl.ColorAlpha(rl.BLACK, 0.5))
 	font_size := 64
 	rl.DrawText(
 		"Game Over",
