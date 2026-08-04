@@ -3,7 +3,6 @@ package main
 import "core:container/queue"
 import "core:fmt"
 import "core:math/rand"
-import "vendor:darwin/MetalKit"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH :: 800
