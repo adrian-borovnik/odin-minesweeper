@@ -8,13 +8,14 @@ import rl "vendor:raylib"
 WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: WINDOW_WIDTH
 
-COLS :: WINDOW_WIDTH / 40
+COLS :: WINDOW_WIDTH / 29
 ROWS :: COLS
 
-CELL_SIZE :: WINDOW_WIDTH / COLS
+CELL_SIZE :: f32(WINDOW_WIDTH) / f32(COLS)
 Grid :: [ROWS * COLS]Cell
 
-MINE_COUNT :: COLS * ROWS / 5
+// MINE_COUNT :: COLS * ROWS / 6
+MINE_COUNT :: 10
 MINE_VALUE :: 9
 
 Textures :: map[string]rl.Texture2D
@@ -41,6 +42,7 @@ Game_State :: enum {
 	INIT,
 	RUNNING,
 	GAME_OVER,
+	WIN,
 }
 
 Game :: struct {
@@ -50,9 +52,20 @@ Game :: struct {
 	quit:     bool,
 }
 
-game_init :: proc(game: ^Game) {
-	load_textures(game)
+set_game_win :: proc(game: ^Game) {
+	game.state = .WIN
+}
 
+
+set_game_over :: proc(game: ^Game) {
+	game.state = .GAME_OVER
+}
+
+set_game_running :: proc(game: ^Game) {
+	game.state = .RUNNING
+}
+
+game_init :: proc(game: ^Game) {
 	game.state = .INIT
 	game.cells = Grid{}
 
@@ -159,19 +172,36 @@ update :: proc(game: ^Game) {
 
 	if rl.IsKeyPressed(.R) do game_init(game)
 
-	if game.state == .GAME_OVER do return
+	if game.state == .GAME_OVER || game.state == .WIN do return
 
 	if rl.IsMouseButtonPressed(.LEFT) {
+		if game.state == .INIT do set_game_running(game)
+
 		coords := get_mouse_coords()
 		idx := get_coord_index(coords)
 		open_cell(game, idx)
+
+		if is_game_won(game) {
+			set_game_win(game)
+			return
+		}
 	}
+
 	if rl.IsMouseButtonPressed(.RIGHT) {
+		if game.state == .INIT do set_game_running(game)
+
 		coords := get_mouse_coords()
 		idx := get_coord_index(coords)
 		flag_cell(game, idx)
 	}
+}
 
+is_game_won :: proc(game: ^Game) -> bool {
+	for c in game.cells {
+		if c.value != MINE_VALUE && c.state == .CLOSED do return false
+	}
+
+	return true
 }
 
 open_cell :: proc(game: ^Game, idx: int) {
@@ -269,18 +299,13 @@ get_coord_index :: proc(coords: Coord) -> int {
 	return coords.row * COLS + coords.col
 }
 
-set_game_over :: proc(game: ^Game) {
-	game.state = .GAME_OVER
-}
-
 draw :: proc(game: ^Game) {
 	rl.ClearBackground(rl.RAYWHITE)
 
 	draw_cells(game)
 
-	if game.state == .GAME_OVER {
-		draw_game_over()
-	}
+	if game.state == .GAME_OVER do draw_game_over()
+	if game.state == .WIN do draw_win()
 }
 
 draw_game_over :: proc() {
@@ -295,10 +320,22 @@ draw_game_over :: proc() {
 	)
 }
 
+draw_win :: proc() {
+	rl.DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, rl.ColorAlpha(rl.BLACK, 0.5))
+	font_size := 64
+	rl.DrawText(
+		"You Won!!!",
+		i32(WINDOW_WIDTH / 2 - 5 * font_size),
+		i32(WINDOW_HEIGHT / 2 - font_size / 2),
+		i32(font_size),
+		rl.WHITE,
+	)
+}
+
 draw_cells :: proc(game: ^Game) {
 	for c in game.cells {
-		x := c.col * CELL_SIZE
-		y := c.row * CELL_SIZE
+		x := f32(c.col) * CELL_SIZE
+		y := f32(c.row) * CELL_SIZE
 
 		texture := get_cell_texture(game, c)
 		pos := rl.Vector2{f32(x), f32(y)}
@@ -310,9 +347,7 @@ draw_cells :: proc(game: ^Game) {
 print_grid :: proc(cells: Grid) {
 	for c, i in cells {
 		fmt.print(fmt.ctprintf("%d ", c.value))
-		if i % COLS == COLS - 1 {
-			fmt.println()
-		}
+		if i % COLS == COLS - 1 do fmt.println()
 	}
 	fmt.println()
 }
@@ -325,6 +360,7 @@ main :: proc() {
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Minesweeper")
 
 	game := Game{}
+	load_textures(&game)
 	game_init(&game)
 
 	defer rl.CloseWindow()
