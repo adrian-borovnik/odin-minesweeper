@@ -8,14 +8,13 @@ import rl "vendor:raylib"
 WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: WINDOW_WIDTH
 
-COLS :: WINDOW_WIDTH / 29
+COLS :: WINDOW_WIDTH / 80
 ROWS :: COLS
 
 CELL_SIZE :: f32(WINDOW_WIDTH) / f32(COLS)
 Grid :: [ROWS * COLS]Cell
 
-// MINE_COUNT :: COLS * ROWS / 6
-MINE_COUNT :: 10
+MINE_COUNT :: COLS * ROWS / 6
 MINE_VALUE :: 9
 
 Textures :: map[string]rl.Texture2D
@@ -212,6 +211,7 @@ is_game_won :: proc(game: ^Game) -> bool {
 
 open_cell :: proc(game: ^Game, idx: int) {
 	q: queue.Queue(int)
+	queue.init(&q, ROWS * COLS)
 	queue.push_back(&q, idx)
 
 	for q.len > 0 {
@@ -234,9 +234,11 @@ open_cell :: proc(game: ^Game, idx: int) {
 			neighbours := get_neighbour_indices(i)
 			for n in neighbours {
 				neighbour := &game.cells[n]
-				if neighbour.state == .OPEN do continue
+				if neighbour.state != .CLOSED do continue
 
-				queue.push_back(&q, n)
+				neighbour.state = .OPEN
+
+				queue.append(&q, n)
 			}
 
 		case .OPEN:
@@ -252,7 +254,7 @@ open_cell :: proc(game: ^Game, idx: int) {
 
 			if flag_count != c.value do continue
 
-			for n in closed_neighbours do queue.push_back(&q, n)
+			for n in closed_neighbours do queue.append(&q, n)
 		}
 	}
 }
@@ -344,6 +346,7 @@ draw_cells :: proc(game: ^Game) {
 		y := f32(c.row) * CELL_SIZE
 
 		texture := get_cell_texture(game, c)
+		MINE_COUNT :: min(COLS * ROWS / 6, 100)
 		pos := rl.Vector2{f32(x), f32(y)}
 		scale := f32(CELL_SIZE) / f32(texture.width)
 		rl.DrawTextureEx(texture^, pos, 0, scale, rl.WHITE)
