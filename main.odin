@@ -128,6 +128,12 @@ load_textures :: proc(game: ^Game) {
 	game.textures["eight"] = rl.LoadTexture("assets/eight.png")
 }
 
+unload_textures :: proc(game: ^Game) {
+	for _, &texture in game.textures {
+		rl.UnloadTexture(texture)
+	}
+}
+
 get_cell_texture :: proc(game: ^Game, c: Cell) -> ^rl.Texture2D {
 	if game.state == .GAME_OVER {
 		if c.value == MINE_VALUE && c.state == .OPEN do return &game.textures["mine_explode"]
@@ -352,8 +358,8 @@ print_grid :: proc(cells: Grid) {
 	fmt.println()
 }
 
-quit :: proc() {
-
+quit :: proc(game: ^Game) {
+	unload_textures(game)
 }
 
 main :: proc() {
@@ -373,5 +379,5 @@ main :: proc() {
 		rl.EndDrawing()
 	}
 
-	quit()
+	quit(&game)
 }
